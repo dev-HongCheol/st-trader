@@ -1,0 +1,20 @@
+# 아래의 명령어로 한번에 필요한 라이브러리 설치
+# ./venv/bin/pip install -r scripts/requirements.txt
+
+# venv 활성화 후 실행
+# source venv/bin/activate
+# python scripts/collect_stock_prices.py
+
+
+# Python 데이터 수집 및 분석
+finance-datareader==0.9.96
+pandas==2.3.3
+
+# Supabase 연결
+supabase==2.22.1
+
+# 환경변수 관리
+python-dotenv==1.1.1
+
+# 날짜 처리
+python-dateutil==2.9.0.post0
