@@ -180,16 +180,16 @@ WHERE direction_correct_3d IS NOT NULL;
 
 -- 추가 인덱스: 뉴스 카테고리별 조회 최적화
 CREATE INDEX idx_st_news_category ON st_news_events(category, event_date DESC);
-COMMENT ON INDEX idx_news_category IS '뉴스 카테고리별 최신순 조회 최적화';
+COMMENT ON INDEX idx_st_news_category IS '뉴스 카테고리별 최신순 조회 최적화';
 
 -- 추가 인덱스: 백테스트 점수 범위 조회
 CREATE INDEX idx_st_backtest_scores ON st_backtest_predictions(combined_score, prediction_date DESC);
-COMMENT ON INDEX idx_backtest_scores IS '고신뢰도 예측 조회 최적화 (combined_score >= 75 OR <= 25)';
+COMMENT ON INDEX idx_st_backtest_scores IS '고신뢰도 예측 조회 최적화 (combined_score >= 75 OR <= 25)';
 
 -- 추가 인덱스: 재무 지표별 조회
-CREATE INDEX idx_st_financial_roe ON st_financial_snapshots(roe, quarter_date DESC) 
+CREATE INDEX idx_st_financial_roe ON st_financial_snapshots(roe, quarter_date DESC)
 WHERE roe IS NOT NULL;
-COMMENT ON INDEX idx_financial_roe IS 'ROE 기준 종목 필터링 최적화';
+COMMENT ON INDEX idx_st_financial_roe IS 'ROE 기준 종목 필터링 최적화';
 
 COMMENT ON TABLE st_backtest_predictions IS '백테스트 예측 결과 및 검증';
 COMMENT ON COLUMN st_backtest_predictions.combined_score IS '재무점수 × 0.6 + 뉴스점수 × 0.4';
