@@ -99,7 +99,7 @@ COMMENT ON COLUMN st_financial_snapshots.roe IS 'ROE (%), 자본 효율성 평�
 
 -- ====================================================================
 
--- 4. 뉴스/이슈 (수동 큐레이션)
+-- 4. 뉴스/이슈 (AI 자동 분석)
 -- 예상 레코드 수: 75개 (5종목 × 15개 주요 이슈)
 CREATE TABLE st_news_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -108,15 +108,20 @@ CREATE TABLE st_news_events (
 
   -- 뉴스 내용
   title TEXT NOT NULL,              -- 뉴스 제목
-  summary TEXT,                     -- 뉴스 요약 (선택)
+  summary TEXT,                     -- 뉴스 요약 (AI 생성 또는 수동)
   source_url TEXT,                  -- 원문 URL
 
-  -- 분류 (수동 입력)
+  -- 분류 (AI 자동 라벨링)
   category VARCHAR(50),             -- 'earnings', 'product', 'regulation', 'macro', 'geopolitics'
 
-  -- 수동 라벨링
-  manual_sentiment VARCHAR(20),     -- 'positive', 'negative', 'neutral'
-  manual_impact VARCHAR(20),        -- 'high', 'medium', 'low'
+  -- AI 라벨링
+  manual_sentiment VARCHAR(20),     -- 'positive', 'negative', 'neutral' (Claude 판단)
+  manual_impact VARCHAR(20),        -- 'high', 'medium', 'low' (Claude 판단)
+
+  -- AI 분석 메타데이터
+  ai_reasoning TEXT,                -- Claude가 sentiment/impact를 판단한 근거
+  ai_confidence DECIMAL(3,2),       -- AI 분석 신뢰도 (0.00-1.00)
+  ai_model VARCHAR(50),             -- 사용한 AI 모델명 (예: claude-sonnet-4.5)
 
   -- 메타데이터
   created_at TIMESTAMP DEFAULT NOW()
@@ -128,10 +133,13 @@ CREATE INDEX idx_st_news_company_date ON st_news_events(company_id, event_date D
 -- 인덱스: 날짜 범위 조회 (백테스트용)
 CREATE INDEX idx_st_news_date_range ON st_news_events(event_date);
 
-COMMENT ON TABLE st_news_events IS '수동 큐레이션된 뉴스/이슈';
+COMMENT ON TABLE st_news_events IS 'AI 자동 분석된 뉴스/이슈 (Claude API 활용)';
 COMMENT ON COLUMN st_news_events.category IS '뉴스 카테고리: earnings(실적), product(제품), regulation(규제), macro(거시경제), geopolitics(지정학)';
-COMMENT ON COLUMN st_news_events.manual_sentiment IS '수동 라벨링 감성: positive(긍정), negative(부정), neutral(중립)';
-COMMENT ON COLUMN st_news_events.manual_impact IS '수동 라벨링 영향도: high(높음), medium(중간), low(낮음)';
+COMMENT ON COLUMN st_news_events.manual_sentiment IS 'AI 라벨링 감성: positive(긍정), negative(부정), neutral(중립)';
+COMMENT ON COLUMN st_news_events.manual_impact IS 'AI 라벨링 영향도: high(높음), medium(중간), low(낮음)';
+COMMENT ON COLUMN st_news_events.ai_reasoning IS 'Claude가 sentiment/impact를 판단한 근거 (디버깅 및 검증용). 예시: "실적 발표에서 예상치를 상회하는 영업이익을 기록하여 positive로 판단"';
+COMMENT ON COLUMN st_news_events.ai_confidence IS 'AI 분석 신뢰도 (0.00-1.00). 0.9 이상: 매우 확실, 0.7-0.9: 높음, 0.5-0.7: 보통 (재검토 권장), 0.5 미만: 낮음 (백테스트 시 가중치 감소)';
+COMMENT ON COLUMN st_news_events.ai_model IS '사용한 AI 모델명. 예시: claude-sonnet-4.5, claude-haiku-3.5. 모델 버전별 성능 비교 및 추적용';
 
 -- ====================================================================
 
@@ -181,6 +189,16 @@ WHERE direction_correct_3d IS NOT NULL;
 -- 추가 인덱스: 뉴스 카테고리별 조회 최적화
 CREATE INDEX idx_st_news_category ON st_news_events(category, event_date DESC);
 COMMENT ON INDEX idx_st_news_category IS '뉴스 카테고리별 최신순 조회 최적화';
+
+-- 추가 인덱스: 고신뢰도 뉴스 조회 최적화
+CREATE INDEX idx_st_news_confidence ON st_news_events(ai_confidence DESC, event_date DESC)
+WHERE ai_confidence IS NOT NULL;
+COMMENT ON INDEX idx_st_news_confidence IS '고신뢰도 뉴스 우선 조회 최적화. 사용 예시: 백테스트 시 confidence >= 0.8인 뉴스만 사용, 알림 시스템에서 confidence >= 0.9인 뉴스만 전송';
+
+-- 추가 인덱스: 낮은 신뢰도 뉴스 조회 (검증/개선용)
+CREATE INDEX idx_st_news_low_confidence ON st_news_events(ai_confidence ASC, event_date DESC)
+WHERE ai_confidence < 0.7;
+COMMENT ON INDEX idx_st_news_low_confidence IS '낮은 신뢰도 뉴스 조회 (재검토 및 fine-tuning 데이터 수집용)';
 
 -- 추가 인덱스: 백테스트 점수 범위 조회
 CREATE INDEX idx_st_backtest_scores ON st_backtest_predictions(combined_score, prediction_date DESC);
@@ -349,11 +367,16 @@ ALTER TABLE st_news_events ADD CONSTRAINT chk_news_category
 CHECK (category IN ('earnings', 'product', 'regulation', 'macro', 'geopolitics'));
 COMMENT ON CONSTRAINT chk_news_category ON st_news_events IS '뉴스 카테고리 값 제한';
 
--- 감성/영향도 값 제한  
+-- 감성/영향도 값 제한
 ALTER TABLE st_news_events ADD CONSTRAINT chk_sentiment_impact
 CHECK (manual_sentiment IN ('positive', 'negative', 'neutral') AND
        manual_impact IN ('high', 'medium', 'low'));
 COMMENT ON CONSTRAINT chk_sentiment_impact ON st_news_events IS '감성/영향도 값 제한';
+
+-- AI 신뢰도 범위 검증
+ALTER TABLE st_news_events ADD CONSTRAINT chk_ai_confidence_range
+CHECK (ai_confidence IS NULL OR (ai_confidence >= 0 AND ai_confidence <= 1));
+COMMENT ON CONSTRAINT chk_ai_confidence_range ON st_news_events IS 'AI 신뢰도는 0.00-1.00 범위 내';
 
 -- 예측 방향/신호 값 제한
 ALTER TABLE st_backtest_predictions ADD CONSTRAINT chk_prediction_values
@@ -378,5 +401,13 @@ COMMENT ON CONSTRAINT chk_prediction_values ON st_backtest_predictions IS '예�
 -- - 수익률: DECIMAL(6,2) → DECIMAL(8,4) (정밀도 향상)
 
 -- ====================================================================
--- 스키마 생성 완료 (v1.1 - 제약조건 및 성능 최적화 추가)
+-- 스키마 생성 완료 (v1.2 - AI 뉴스 분석 메타데이터 추가)
+-- ====================================================================
+-- 변경 이력:
+-- v1.0: 초기 스키마 생성
+-- v1.1: 제약조건 및 성능 최적화 추가
+-- v1.2: st_news_events 테이블에 AI 분석 메타데이터 추가
+--       - ai_reasoning, ai_confidence, ai_model 컬럼 추가
+--       - AI 신뢰도 기반 인덱스 추가
+--       - AI 신뢰도 범위 검증 제약조건 추가
 -- ====================================================================

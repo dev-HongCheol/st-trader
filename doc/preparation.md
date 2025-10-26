@@ -108,22 +108,30 @@
 
 **수집 도구**: Node.js (TypeScript)
 
-#### C. 뉴스 데이터 (수동 큐레이션)
+#### C. 뉴스 데이터 (하이브리드 AI 분석) ⭐ 업데이트됨
 
 **문제점:**
 - 네이버 뉴스 API: 과거 1개월만 조회 가능
 - 과거 3개월 데이터는 API로 불가능
+- 수동 큐레이션: 전문성 부족으로 낮은 신뢰도
 
-**해결책:**
-1. 네이버 뉴스 검색으로 과거 기사 수동 검색
-2. 주요 이슈만 선별 (종목당 15개, 총 75개)
-3. 구글 스프레드시트 템플릿에 입력
-4. CSV 다운로드 → Supabase 임포트
+**해결책 (하이브리드 전략):**
+1. **네이버 뉴스 검색 크롤링**: 과거 3개월 기사 수집 (종목당 50개)
+2. **Claude Haiku 1차 필터링**: 관련성 판단 (250개 → 100개)
+3. **Claude Sonnet 4.5 심층 분석**: 감성/영향도 자동 분석 (100개 → 75개)
+4. **Supabase 저장**: AI 분석 결과 + 근거(reasoning) 저장
+
+**비용**: $1.70-2.20 (Prompt Caching 적용)
+**시간**: 20-30분 (완전 자동화)
+**정확도**: 기존 수동 대비 2-3배 향상 예상
+
+**상세 문서**: [`doc/news-collection-strategy.md`](./news-collection-strategy.md)
 
 **수집 항목:**
 - 날짜, 종목, 제목, 요약, URL
 - 카테고리: `earnings`, `product`, `regulation`, `macro`, `geopolitics`
-- 수동 라벨링: 감성(`positive`, `negative`, `neutral`), 영향도(`high`, `medium`, `low`)
+- AI 라벨링: 감성(`positive`, `negative`, `neutral`), 영향도(`high`, `medium`, `low`)
+- AI 메타데이터: `ai_reasoning`, `ai_confidence`, `ai_model`
 
 ### 대상 종목 (5개)
 
@@ -519,25 +527,29 @@ NAVER_CLIENT_SECRET=your-naver-client-secret
    - DART API 키 발급
    - 네이버 API 키 발급 (선택)
 
-3. **뉴스 템플릿 준비**
-   - 구글 스프레드시트 생성
-   - 컬럼: 날짜, 종목, 제목, 요약, 카테고리, 감성, 영향도, URL
+3. **뉴스 수집 준비** ⭐ 업데이트됨
+   - Claude API 키 발급 (Anthropic)
+   - Playwright 설치 (`npx playwright install chromium`)
+   - 환경 변수 설정 (`ANTHROPIC_API_KEY`)
+   - 상세 가이드: [`doc/news-collection-strategy.md`](./news-collection-strategy.md)
 
 ### 1주차 목표
 
-**주가 + 재무 데이터 수집 완료**
-- 450개 주가 레코드
+**주가 + 재무 + 뉴스 데이터 수집 완료**
+- 450개 주가 레코드 ✅
 - 10개 재무 스냅샷
-- 75개 뉴스 이벤트 (수동 입력)
+- 75개 뉴스 이벤트 (AI 자동 분석)
 
 ---
 
 ## 참고 문서
 
 - [데이터베이스 스키마](./schema.sql)
+- [뉴스 수집 전략 (하이브리드 AI)](./news-collection-strategy.md) ⭐ 신규
 - [DART API 문서](https://opendart.fss.or.kr/guide/main.do)
 - [FinanceDataReader 문서](https://github.com/FinanceData/FinanceDataReader)
 - [Supabase 셀프호스팅 가이드](https://supabase.com/docs/guides/self-hosting)
+- [Claude API 문서](https://docs.anthropic.com/en/api/getting-started)
 
 ---
 
