@@ -1,0 +1,33 @@
+{
+  "config": {
+    "dataCollectionMonths": 3,
+    "description": "주가 및 뉴스 데이터 수집 기간 (개월)"
+  },
+  "stocks": [
+    {
+      "ticker": "005930",
+      "name": "삼성전자",
+      "sector": "반도체"
+    },
+    {
+      "ticker": "000660",
+      "name": "SK하이닉스",
+      "sector": "반도체"
+    },
+    {
+      "ticker": "035420",
+      "name": "NAVER",
+      "sector": "IT/인터넷"
+    },
+    {
+      "ticker": "035720",
+      "name": "카카오",
+      "sector": "IT/인터넷"
+    },
+    {
+      "ticker": "005380",
+      "name": "현대차",
+      "sector": "자동차"
+    }
+  ]
+}
