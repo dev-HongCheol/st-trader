@@ -354,16 +354,16 @@ psql -h supa.devhong.cc -U postgres -d postgres -f doc/schema-news-extension.sql
 ### 3. 뉴스 수집 및 분석 실행
 ```bash
 # 1단계: 크롤링 (예상 시간: 10-15분)
-npx ts-node scripts/crawl_news.ts
+npx tsx scripts/crawl_news.ts
 
 # 2단계: 1차 필터링 (예상 시간: 3-5분, 비용: $0.5)
-npx ts-node scripts/filter_news_relevance.ts
+npx tsx scripts/filter_news_relevance.ts
 
 # 3단계: 심층 분석 (예상 시간: 5-10분, 비용: $1.2-2.0)
-npx ts-node scripts/analyze_news_sentiment.ts
+npx tsx scripts/analyze_news_sentiment.ts
 
 # 4단계: DB 저장 (예상 시간: 1-2분)
-npx ts-node scripts/import_analyzed_news.ts
+npx tsx scripts/import_analyzed_news.ts
 ```
 
 ### 4. 검증
